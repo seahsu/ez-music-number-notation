@@ -1,0 +1,2363 @@
+<!doctype html>
+<html lang="zh-TW">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+		<title>Markdown Numbered Score Editor</title>
+		<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Zpix&display=swap" rel="stylesheet" />
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+		<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/tone@14/build/Tone.js"></script>
+		<style>
+			/* ── Variables (dark 8-bit theme) ─────────────────────── */
+			:root {
+				/* Dark (default) */
+				--bg: #000;
+				--bg2: #0d0d0d;
+				--bg3: #1a1a1a;
+				--fg: #fff;
+				--fg2: #fff;
+				--fg3: #aaa;
+				--acc: #fff;
+				--muted: #333;
+				--mtxt: #555;
+				--white: #fff;
+				--cell-h: #1a1a1a;
+				--sh: 3px 3px 0 #fff;
+				--px: "Press Start 2P", Zpix, monospace;
+				--mono: "Courier New", monospace;
+			}
+			/* ── Light theme — pure white, no tint ────────────────── */
+			body.light {
+				--bg: #fff;
+				--bg2: #fff;
+				--bg3: #f0f0f0;
+				--fg: #000;
+				--fg2: #000;
+				--fg3: #555;
+				--acc: #000;
+				--muted: #ccc;
+				--mtxt: #999;
+				--white: #000;
+				--cell-h: #f5f5f5;
+				--sh: 3px 3px 0 #000;
+			}
+			/* ── Reset ─────────────────────────────────────────────── */
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+			body {
+				background: var(--bg);
+				color: var(--fg);
+				font-family: var(--mono);
+				font-size: 15px;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				padding: 12px;
+			}
+			/* ── Header ───────────────────────────────────────────── */
+			#hdr {
+				display: flex;
+				align-items: center;
+				gap: 14px;
+				padding: 12px 18px;
+				background: var(--bg2);
+				border: 2px solid var(--fg);
+				box-shadow: var(--sh);
+			}
+			#hdr h1 {
+				font-family: var(--px);
+				font-size: 10px;
+				color: var(--fg);
+				line-height: 1.9;
+				white-space: nowrap;
+				flex-shrink: 0;
+			}
+			#title-in {
+				flex: 1;
+				min-width: 0;
+				background: var(--bg);
+				border: 2px solid var(--muted);
+				color: var(--fg);
+				font-family: var(--px);
+				font-size: 11px;
+				padding: 8px 14px;
+				outline: none;
+				text-align: center;
+			}
+			#title-in:focus {
+				border-color: var(--fg);
+			}
+			#hdr-right {
+				display: flex;
+				gap: 8px;
+				flex-shrink: 0;
+				margin-left: auto;
+				align-items: center;
+			}
+			#file-badge {
+				font-family: var(--px);
+				font-size: 7px;
+				color: var(--fg3);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				max-width: 120px;
+				border: 1px solid var(--muted);
+				padding: 3px 6px;
+			}
+			/* All header buttons — retro 2px border + offset shadow */
+			.hdr-btn {
+				font-family: var(--px);
+				font-size: 9px;
+				padding: 9px 14px;
+				cursor: pointer;
+				background: var(--bg);
+				color: var(--fg);
+				border: 2px solid var(--fg);
+				box-shadow: var(--sh);
+				outline: none;
+				white-space: nowrap;
+			}
+			.hdr-btn:hover {
+				background: color-mix(in srgb, var(--fg) 28%, var(--bg));
+			}
+			.hdr-btn:active {
+				transform: translate(2px, 2px);
+				box-shadow: 1px 1px 0 var(--fg);
+			}
+			.hdr-btn:disabled {
+				opacity: 0.35;
+				cursor: default;
+				pointer-events: none;
+			}
+			/* PLAY and THEME are inverted by default to stand out */
+			button#play-btn,
+			button#theme-btn {
+				background: var(--fg);
+				color: var(--bg);
+			}
+			button#play-btn:hover,
+			button#theme-btn:hover {
+				background: color-mix(in srgb, var(--bg) 28%, var(--fg)) !important;
+				color: var(--bg);
+			}
+			button#stop-btn:hover {
+				background: color-mix(in srgb, var(--fg) 28%, var(--bg)) !important;
+			}
+			button#play-btn:active,
+			button#theme-btn:active {
+				transform: translate(2px, 2px);
+				box-shadow: 1px 1px 0 var(--fg);
+			}
+			/* nb / xb / mb / cb — flatten to B&W */
+			button.nb,
+			button.mb,
+			button.cb,
+			button.xb {
+				background: var(--bg) !important;
+				color: var(--fg) !important;
+				border: 2px solid var(--fg) !important;
+				box-shadow: var(--sh) !important;
+			}
+			button#play-btn.nb {
+				background: var(--fg) !important;
+				color: var(--bg) !important;
+			}
+			button#play-btn.nb:hover {
+				background: color-mix(in srgb, var(--bg) 28%, var(--fg)) !important;
+			}
+			#import-lbl {
+				background: var(--bg);
+				color: var(--fg);
+				border: 2px solid var(--fg);
+				box-shadow: var(--sh);
+				font-family: var(--px);
+				font-size: 9px;
+				padding: 9px 14px;
+				cursor: pointer;
+				user-select: none;
+			}
+			#import-lbl:hover {
+				background: color-mix(in srgb, var(--fg) 28%, var(--bg));
+			}
+			#import-lbl:active {
+				transform: translate(2px, 2px);
+				box-shadow: 1px 1px 0 var(--fg);
+			}
+			/* ── Parts bar ────────────────────────────────────────── */
+			#parts-bar {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 8px;
+				padding: 10px 12px;
+				background: var(--bg2);
+				border: 2px solid var(--muted);
+			}
+			.part-chip {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				background: var(--bg3);
+				border: 2px solid var(--muted);
+				padding: 6px 10px;
+			}
+			.part-chip.active-chip {
+				border-color: var(--fg);
+			}
+			input.pname {
+				background: transparent;
+				border: none;
+				color: var(--fg);
+				font-family: var(--px);
+				font-size: 10px;
+				width: 120px;
+				outline: none;
+			}
+			input.pname:focus {
+				border-bottom: 1px solid var(--fg);
+			}
+			.chip-btn {
+				background: transparent;
+				color: var(--mtxt);
+				border: none;
+				font-family: var(--px);
+				font-size: 10px;
+				cursor: pointer;
+				padding: 2px 5px;
+			}
+			.chip-btn:hover {
+				color: var(--fg);
+			}
+			.chip-btn.del:hover {
+				color: var(--fg);
+				text-decoration: line-through;
+			}
+			#add-part-btn {
+				font-family: var(--px);
+				font-size: 11px;
+				padding: 8px 14px;
+				background: transparent;
+				color: var(--fg);
+				border: 2px dashed var(--muted);
+				cursor: pointer;
+			}
+			#add-part-btn:hover {
+				border-style: solid;
+			}
+			/* ── Preview ──────────────────────────────────────────── */
+			#preview-box {
+				background: var(--bg2);
+				border: 2px solid var(--fg);
+				padding: 14px;
+				overflow-x: auto;
+				min-height: 120px;
+			}
+			.prev-title {
+				font-family: var(--px);
+				font-size: 13px;
+				color: var(--fg);
+				text-align: center;
+				margin-bottom: 14px;
+			}
+			.sys {
+				border-collapse: collapse;
+				table-layout: fixed;
+				margin-bottom: 18px;
+				width: 100%;
+			}
+			.sys td {
+				padding: 7px 12px;
+				vertical-align: middle;
+				border: 1px solid var(--muted);
+			}
+			.pn-cell {
+				font-family: var(--px);
+				font-size: 13px;
+				background: var(--bg3);
+				color: var(--fg);
+				white-space: nowrap;
+				border-right: 2px solid var(--muted) !important;
+				user-select: none;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.m-cell {
+				color: var(--fg);
+				font-size: 17px;
+				cursor: pointer;
+				position: relative;
+			}
+			.m-inner {
+				display: flex;
+				align-items: baseline;
+				overflow: hidden;
+				width: 100%;
+				user-select: none;
+			}
+			.m-cell.copy-sel {
+				outline: 3px solid #0cf;
+				outline-offset: -3px;
+				background: color-mix(in srgb, #0cf 28%, transparent);
+				box-shadow: inset 0 0 0 1px #0cf;
+			}
+			.bslot {
+				display: inline-flex;
+				align-items: baseline;
+				justify-content: center;
+				min-width: 0;
+				overflow: hidden;
+			}
+			.m-cell.repeat-start {
+				border-left: 4px solid var(--fg) !important;
+			}
+			.m-cell.repeat-end {
+				border-right: 4px solid var(--fg) !important;
+			}
+			.m-cell:hover {
+				background: var(--cell-h);
+			}
+			.m-cell.selected {
+				outline: 2px solid var(--fg3);
+				outline-offset: -2px;
+			}
+			.m-cell.playhead {
+				outline: 2px solid var(--fg);
+				outline-offset: -2px;
+			}
+			.m-cell.playing {
+				background: color-mix(in srgb, var(--fg) 14%, transparent) !important;
+				outline: 2px solid var(--fg);
+				outline-offset: -2px;
+			}
+			.m-cell .mnum {
+				position: absolute;
+				top: 3px;
+				right: 4px;
+				font-family: var(--px);
+				font-size: 7px;
+				color: var(--mtxt);
+				cursor: grab;
+				pointer-events: all;
+			}
+			.m-cell .mnum:hover {
+				color: var(--fg);
+			}
+			.m-add-cell {
+				color: var(--mtxt);
+				font-family: var(--px);
+				font-size: 11px;
+				text-align: center;
+				cursor: pointer;
+				width: 40px;
+			}
+			.m-add-cell:hover {
+				color: var(--fg);
+				background: var(--cell-h);
+			}
+			.acc {
+				color: var(--fg);
+			}
+			.tie {
+				color: var(--fg3);
+				margin: 0 2px;
+			}
+			.empty {
+				color: var(--mtxt);
+			}
+			.no-notes {
+				color: var(--mtxt);
+				font-family: var(--px);
+				font-size: 10px;
+				text-align: center;
+				padding: 28px;
+			}
+			.katex {
+				font-size: 1.1em;
+			}
+			/* ── Popup ────────────────────────────────────────────── */
+			#overlay {
+				position: fixed;
+				inset: 0;
+				background: #0007;
+				z-index: 100;
+				display: none;
+				align-items: center;
+				justify-content: center;
+			}
+			body.light #overlay {
+				background: #fff7;
+			}
+			#overlay.open {
+				display: flex;
+			}
+			#popup {
+				background: var(--bg2);
+				border: 2px solid var(--fg);
+				box-shadow: var(--sh);
+				padding: 20px;
+				width: min(600px, 94vw);
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+			#pop-hdr {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+			#pop-label {
+				font-family: var(--px);
+				font-size: 13px;
+				color: var(--fg3);
+				flex: 1;
+			}
+			.pop-nav {
+				font-family: var(--px);
+				font-size: 13px;
+				background: var(--bg);
+				color: var(--fg);
+				border: 2px solid var(--muted);
+				padding: 6px 12px;
+				cursor: pointer;
+				box-shadow: 2px 2px 0 var(--muted);
+			}
+			.pop-nav:hover:not(:disabled) {
+				border-color: var(--fg);
+				box-shadow: 2px 2px 0 var(--fg);
+			}
+			.pop-nav:active:not(:disabled) {
+				transform: translate(1px, 1px);
+				box-shadow: 1px 1px 0 var(--fg);
+			}
+			.pop-nav:disabled {
+				opacity: 0.3;
+				cursor: default;
+			}
+			#pop-close {
+				font-family: var(--px);
+				font-size: 13px;
+				background: var(--fg);
+				color: var(--bg);
+				border: 2px solid var(--fg);
+				padding: 6px 12px;
+				cursor: pointer;
+				box-shadow: 2px 2px 0 var(--fg);
+			}
+			#pop-close:hover {
+				background: var(--bg);
+				color: var(--fg);
+			}
+			#pop-close:active {
+				transform: translate(1px, 1px);
+				box-shadow: 1px 1px 0 var(--fg);
+			}
+			#pop-ta {
+				width: 100%;
+				background: var(--bg);
+				border: 2px solid var(--muted);
+				color: var(--fg);
+				font-family: var(--mono);
+				font-size: 20px;
+				padding: 12px;
+				resize: vertical;
+				min-height: 80px;
+				outline: none;
+				line-height: 1.7;
+				letter-spacing: 0.04em;
+			}
+			#pop-ta:focus {
+				border-color: var(--fg);
+			}
+			#pop-hint {
+				font-family: var(--px);
+				font-size: 9px;
+				color: var(--fg3);
+				line-height: 2.2;
+				display: grid;
+				grid-template-columns: max-content 1fr;
+				column-gap: 14px;
+				row-gap: 0;
+				overflow: hidden;
+			}
+			#pop-hint .ph-sym {
+				color: var(--fg);
+				white-space: nowrap;
+			}
+			#pop-hint .ph-desc {
+				overflow-wrap: break-word;
+				min-width: 0;
+			}
+			/* ── Export ───────────────────────────────────────────── */
+			#export-btn,
+			#print-btn {
+				font-family: var(--px);
+				font-size: 9px;
+				padding: 9px 14px;
+				cursor: pointer;
+				background: var(--bg);
+				color: var(--fg);
+				border: 2px solid var(--fg);
+				box-shadow: var(--sh);
+				outline: none;
+				white-space: nowrap;
+			}
+			#export-btn:hover,
+			#print-btn:hover {
+				background: color-mix(in srgb, var(--fg) 28%, var(--bg));
+			}
+			.hdr-btn:disabled {
+				opacity: 0.3;
+				cursor: default;
+				pointer-events: none;
+				box-shadow: none;
+			}
+			/* ── Print / A4 ───────────────────────────────────────── */
+			@media print {
+				@page {
+					size: A4 portrait;
+					margin: 15mm;
+				}
+				#hdr,
+				#parts-bar,
+				#export-btn,
+				#print-btn,
+				#overlay,
+				#transport {
+					display: none !important;
+				}
+				body {
+					padding-bottom: 0 !important;
+				}
+				body {
+					background: #fff !important;
+					color: #000 !important;
+				}
+				#preview-box {
+					border: none !important;
+					background: #fff !important;
+					padding: 0 !important;
+					overflow: visible !important;
+				}
+				.prev-title {
+					color: #000 !important;
+				}
+				.sys {
+					width: 100% !important;
+					break-inside: avoid;
+					table-layout: fixed !important;
+					border-collapse: separate !important;
+					border-spacing: 0 !important;
+					border: none !important;
+				}
+				.sys td {
+					color: #000 !important;
+					border-top: 1px solid #999 !important;
+					border-left: 1px solid #999 !important;
+				}
+				.sys tr:last-child td {
+					border-bottom: 1px solid #999 !important;
+				}
+				.sys td:last-child {
+					border-right: 1px solid #999 !important;
+				}
+				.m-cell {
+					font-size: 15px !important;
+				}
+				.m-inner {
+					display: flex !important;
+					width: 100% !important;
+					overflow: hidden !important;
+					white-space: nowrap !important;
+				}
+				.bslot {
+					/* Render model MUST match the measurement model in autoFitMeasures():
+					   each slot is at least as wide as its glyphs. The font auto-fit guarantees
+					   the sum of slot contents fits the cell, so beats only distribute the
+					   leftover slack — slots can never overflow into each other (重疊) or be
+					   clipped by .m-inner (消失). */
+					min-width: max-content !important;
+					overflow: visible !important;
+				}
+				.m-cell.repeat-start {
+					border-left: 3px solid #333 !important;
+				}
+				.m-cell.repeat-end {
+					border-right: 3px solid #333 !important;
+				}
+				.pn-cell {
+					background: #efefef !important;
+					color: #333 !important;
+					border-right: 1px solid #999 !important;
+					-webkit-print-color-adjust: exact;
+					print-color-adjust: exact;
+				}
+				.m-add-cell {
+					display: none !important;
+				}
+				.m-cell {
+					color: #000 !important;
+				}
+				.m-cell.playhead,
+				.m-cell.playing {
+					outline: none !important;
+					background: transparent !important;
+				}
+				.mnum {
+					color: #aaa !important;
+				}
+				.acc,
+				.tie {
+					color: #333 !important;
+				}
+				.empty {
+					color: #bbb !important;
+				}
+				.katex {
+					color: #000 !important;
+				}
+			}
+			/* ── Transport bar (fixed bottom) ─────────────────────── */
+			#transport {
+				position: fixed;
+				bottom: 0;
+				left: 0;
+				right: 0;
+				z-index: 200;
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				flex-wrap: nowrap;
+				padding: 10px 18px;
+				background: var(--bg2);
+				border-top: 2px solid var(--fg);
+				box-shadow: 0 -3px 0 var(--fg);
+			}
+			body {
+				padding-bottom: 68px;
+			}
+			/* ── Seek wrap ────────────────────────────────────────── */
+			#seek-wrap {
+				display: flex;
+				align-items: center;
+				gap: 4px;
+			}
+			#seek-label {
+				font-family: var(--px);
+				font-size: 8px;
+				color: var(--fg3);
+				min-width: 34px;
+				text-align: center;
+			}
+			#seek-prev,
+			#seek-next {
+				padding: 9px 10px;
+			}
+			/* ── Playback controls ────────────────────────────────── */
+			#bpm-wrap,
+			#vol-wrap {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			#bpm-wrap label,
+			#vol-wrap label {
+				font-family: var(--px);
+				font-size: 8px;
+				color: var(--mtxt);
+			}
+			#bpm-in {
+				width: 54px;
+				background: var(--bg);
+				border: 2px solid var(--muted);
+				color: var(--fg);
+				font-family: var(--px);
+				font-size: 9px;
+				padding: 8px 4px;
+				text-align: center;
+				outline: none;
+				-moz-appearance: textfield;
+				appearance: textfield;
+			}
+			#bpm-in:focus {
+				border-color: var(--fg);
+			}
+			#bpm-in::-webkit-inner-spin-button,
+			#bpm-in::-webkit-outer-spin-button {
+				-webkit-appearance: none;
+				margin: 0;
+			}
+			.bpm-btn {
+				font-family: var(--mono);
+				font-size: 12px;
+				padding: 0;
+				width: 22px;
+				height: 38px;
+				cursor: pointer;
+				background: var(--bg);
+				color: var(--fg);
+				border: 2px solid var(--muted);
+				outline: none;
+				line-height: 1;
+			}
+			.bpm-btn:hover {
+				background: color-mix(in srgb, var(--fg) 28%, var(--bg));
+			}
+			.bpm-btn:active {
+				transform: translate(1px, 1px);
+			}
+			#vol-in {
+				width: 72px;
+				accent-color: var(--fg);
+				cursor: pointer;
+			}
+			#vol-in:focus {
+				outline: none;
+			}
+			#vol-label {
+				font-family: var(--px);
+				font-size: 9px;
+				color: var(--mtxt);
+				min-width: 42px;
+			}
+			/* ── Placeholders ─────────────────────────────────────── */
+			#title-in::placeholder {
+				color: var(--fg3);
+				opacity: 1;
+			}
+			#pop-ta::placeholder {
+				color: var(--fg3);
+				opacity: 1;
+				font-size: 13px;
+				line-height: 1.9;
+			}
+			/* ── Scrollbar ────────────────────────────────────────── */
+			::-webkit-scrollbar {
+				width: 5px;
+				height: 5px;
+			}
+			::-webkit-scrollbar-track {
+				background: var(--bg);
+			}
+			::-webkit-scrollbar-thumb {
+				background: var(--muted);
+			}
+			::-webkit-scrollbar-thumb:hover {
+				background: var(--fg);
+			}
+			/* ── Save toast ───────────────────────────────────────── */
+			#save-toast {
+				position: fixed;
+				bottom: 80px;
+				right: 18px;
+				z-index: 300;
+				font-family: var(--px);
+				font-size: 9px;
+				padding: 10px 16px;
+				background: var(--fg);
+				color: var(--bg);
+				border: 2px solid var(--fg);
+				box-shadow: var(--sh);
+				opacity: 0;
+				transition: opacity 0.2s;
+				pointer-events: none;
+			}
+			#save-toast.show {
+				opacity: 1;
+			}
+		</style>
+	</head>
+	<body>
+		<!-- Header -->
+		<div id="hdr">
+			<h1>♪ MARKDOWN<br />NUMBERED SCORE EDITOR ♪</h1>
+			<input id="title-in" type="text" placeholder="SONG TITLE" />
+			<div id="hdr-right">
+				<span id="file-badge" style="display:none"></span>
+				<button id="new-btn" class="hdr-btn">✦ NEW</button>
+				<button id="save-btn" class="hdr-btn" disabled>↓ SAVE</button>
+				<button id="new-file-btn" class="hdr-btn">✦ NEW FILE</button>
+				<button id="share-btn" class="hdr-btn">⇗ SHARE</button>
+				<button id="theme-btn" class="hdr-btn">◻ LITE</button>
+				<button id="import-btn" class="hdr-btn">⬆ IMPORT</button>
+				<input type="file" id="import-file" accept=".json" style="display: none" />
+			</div>
+		</div>
+
+		<!-- Parts bar -->
+		<div id="parts-bar">
+			<div id="chips"></div>
+			<button id="add-part-btn">+ PART</button>
+		</div>
+
+		<!-- Score -->
+		<div id="preview-box"><div class="no-notes">NO NOTES YET</div></div>
+
+		<!-- Fixed transport bar -->
+		<div id="transport">
+			<div id="vol-wrap">
+				<label for="vol-in">VOL</label>
+				<input id="vol-in" type="range" min="0" max="100" value="50" />
+				<span id="vol-label">50%</span>
+			</div>
+			<div id="bpm-wrap">
+				<label for="bpm-in">BPM</label>
+				<button class="bpm-btn" id="bpm-dn" tabindex="-1">▼</button>
+				<input id="bpm-in" type="number" value="120" min="40" max="300" />
+				<button class="bpm-btn" id="bpm-up" tabindex="-1">▲</button>
+			</div>
+			<div id="seek-wrap">
+				<button class="hdr-btn" id="seek-prev">◀</button>
+				<span id="seek-label">M 1</span>
+				<button class="hdr-btn" id="seek-next">▶</button>
+			</div>
+			<button id="play-btn" class="hdr-btn nb">▶ PLAY</button>
+			<button id="stop-btn" class="hdr-btn xb" disabled>■ STOP</button>
+			<div style="width: 1px; background: var(--muted); align-self: stretch"></div>
+			<button id="export-btn">⬇ MD</button>
+			<button id="print-btn">⬇ A4</button>
+		</div>
+
+		<!-- Save toast -->
+		<div id="save-toast">SAVED</div>
+
+		<!-- Popup overlay -->
+		<div id="overlay">
+			<div id="popup">
+				<div id="pop-hdr">
+					<span id="pop-label">PART 1 · MEASURE 1</span>
+					<button class="pop-nav" id="pop-prev" title="Previous measure">◀</button>
+					<button class="pop-nav" id="pop-next" title="Next measure">▶</button>
+					<button id="pop-close">× CLOSE</button>
+				</div>
+				<textarea id="pop-ta" rows="3" placeholder="Enter notes, e.g.: 1 _2 __34 '5 0&#10;_0. __'4 __'3 __'4 _'2+__'2 7---"></textarea>
+				<div id="pop-hint">
+					<span class="ph-sym">1–7</span><span class="ph-desc">scale degrees do re mi fa sol la ti</span>
+					<span class="ph-sym">0</span><span class="ph-desc">rest</span>
+					<span class="ph-sym">_note</span><span class="ph-desc">eighth note (one underline)</span>
+					<span class="ph-sym">__note</span><span class="ph-desc">sixteenth note (two underlines)</span>
+					<span class="ph-sym">.</span><span class="ph-desc">dotted — adds half the note value</span>
+					<span class="ph-sym">-</span><span class="ph-desc">extend by one beat</span>
+					<span class="ph-sym">'</span><span class="ph-desc">octave up</span>
+					<span class="ph-sym">,</span><span class="ph-desc">octave down</span>
+					<span class="ph-sym">+</span><span class="ph-desc">tie (also used across barlines)</span>
+					<span class="ph-sym">|</span><span class="ph-desc">split into a new measure</span>
+					<span class="ph-sym">x</span><span class="ph-desc">rhythm hit (percussion)</span>
+					<span class="ph-sym">*</span><span class="ph-desc">bold — place before note or chord</span>
+					<span class="ph-sym">Am Gm7</span><span class="ph-desc">chord name (starts with uppercase letter)</span>
+					<span class="ph-sym">bB bE</span><span class="ph-desc">flat chord (lowercase b + uppercase letter)</span>
+				</div>
+			</div>
+		</div>
+
+		<script src="notation.js"></script>
+		<script>
+			// Notation core (parseNote / expandTok / parseMeasure / beat math) lives in
+			// notation.js — loaded above and shared with notation.test.mjs.
+			// ── State ─────────────────────────────────────────────────────────────────────
+			const S = {
+				title: "",
+				parts: [{ id: 1, name: "PART 1", measures: [""] }],
+				nextId: 2,
+				theme: "dark",
+				pop: null, // { pi, mi } — active popup cell
+				playFromMi: 0, // measure to start playback from (set by dragging mnum)
+				playingMi: -1, // measure currently playing (-1 = not playing)
+				sel: new Set(), // "pi:mi" keys of copy-selected cells
+			}
+			// [{dpi, dmi, text}] offsets from the top-left of the copied selection
+			let cellClipboard = null
+			// Cache: measure text → rendered m-inner HTML (KaTeX output is pure function of text)
+			const _renderCache = new Map()
+			// Cache: "text|availPx|basePx" → shrunk fontSize (number) or 0 if no shrink needed
+			const _fitCache = new Map()
+			const MPR = 4 // measures per row
+			const STORAGE_KEY = "jianpu_draft"
+			const HISTORY_KEY = "jianpu_history"
+			const HIST_MAX = 10
+			let hist = []   // array of {title, parts} snapshots, oldest first
+			let histIdx = -1 // index of current state in hist
+			let previewTimer = null
+			let saveTimer = null
+			let toastTimer = null
+			let _fileHandle = null  // FileSystemFileHandle when opened via File System Access API
+			let _fileName = null    // filename string for display / fallback download
+
+			// ── Storage ───────────────────────────────────────────────────────────────────
+			function saveToStorage() {
+				const bpmIn = document.getElementById("bpm-in")
+				const data = {
+					title: S.title,
+					parts: S.parts,
+					nextId: S.nextId,
+					theme: S.theme,
+					bpm: bpmIn ? +bpmIn.value : 120,
+				}
+				try {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+				} catch (e) {}
+			}
+
+			function loadFromStorage() {
+				try {
+					const raw = localStorage.getItem(STORAGE_KEY)
+					if (!raw) return false
+					const data = JSON.parse(raw)
+					if (data.title !== undefined) {
+						S.title = data.title
+						document.getElementById("title-in").value = data.title
+					}
+					if (Array.isArray(data.parts) && data.parts.length) {
+						S.parts = data.parts
+						S.nextId = data.nextId || S.parts.length + 1
+					}
+					if (data.theme) {
+						S.theme = data.theme
+						document.body.classList.toggle("light", data.theme === "light")
+						document.getElementById("theme-btn").textContent = data.theme === "dark" ? "◻ LITE" : "◼ DARK"
+					}
+					if (data.bpm) {
+						const bpmIn = document.getElementById("bpm-in")
+						if (bpmIn) bpmIn.value = data.bpm
+					}
+					return true
+				} catch (e) {
+					return false
+				}
+			}
+
+			function showToast(msg) {
+				const t = document.getElementById("save-toast")
+				if (msg) t.textContent = msg
+				t.classList.add("show")
+				clearTimeout(toastTimer)
+				toastTimer = setTimeout(() => { t.classList.remove("show"); t.textContent = "SAVED" }, 1500)
+			}
+
+			// ── Undo / Redo ───────────────────────────────────────────────────────────────
+			function snapParts() {
+				// Measures are strings (immutable), so a shallow copy of each array is sufficient.
+				return S.parts.map((p) => ({ id: p.id, name: p.name, measures: [...p.measures] }))
+			}
+
+			function pushHistory() {
+				// Truncate any redo states ahead of current position
+				hist.splice(histIdx + 1)
+				hist.push({ title: S.title, parts: snapParts() })
+				if (hist.length > HIST_MAX) hist.shift()
+				histIdx = hist.length - 1
+				saveHistoryToStorage()
+			}
+
+			function applySnap(snap) {
+				S.title = snap.title
+				S.parts = snap.parts.map((p) => ({ id: p.id, name: p.name, measures: [...p.measures] }))
+				S.nextId = Math.max(...S.parts.map((p) => p.id), 0) + 1
+				S.pop = null
+				S.sel.clear()
+				document.getElementById("title-in").value = S.title
+				document.getElementById("overlay").classList.remove("open")
+				renderChips()
+				sched()
+			}
+
+			function undo() {
+				if (histIdx <= 0) return
+				histIdx--
+				applySnap(hist[histIdx])
+				saveHistoryToStorage()
+				showToast("UNDO")
+			}
+
+			function redo() {
+				if (histIdx >= hist.length - 1) return
+				histIdx++
+				applySnap(hist[histIdx])
+				saveHistoryToStorage()
+				showToast("REDO")
+			}
+
+			let _histSaveTimer = null
+			function saveHistoryToStorage() {
+				clearTimeout(_histSaveTimer)
+				_histSaveTimer = setTimeout(() => {
+					try { localStorage.setItem(HISTORY_KEY, JSON.stringify({ hist, histIdx })) } catch (e) {}
+				}, 400)
+			}
+
+			function loadHistoryFromStorage() {
+				try {
+					const raw = localStorage.getItem(HISTORY_KEY)
+					if (!raw) return false
+					const data = JSON.parse(raw)
+					if (!Array.isArray(data.hist) || !data.hist.length) return false
+					hist = data.hist
+					histIdx = typeof data.histIdx === "number" ? Math.min(data.histIdx, hist.length - 1) : hist.length - 1
+					return true
+				} catch (e) {
+					return false
+				}
+			}
+
+			// ── Share URL ─────────────────────────────────────────────────────────────────
+			// Encode Unicode string to base64 safely (handles CJK + emoji).
+			function b64enc(str) {
+				return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, c) => String.fromCharCode(parseInt(c, 16))))
+			}
+			function b64dec(str) {
+				return decodeURIComponent(atob(str).replace(/./g, (c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")))
+			}
+
+			function shareURL() {
+				const params = new URLSearchParams()
+				if (S.title) params.set("_title", b64enc(S.title))
+				S.parts.forEach((p) => params.append(p.name, b64enc(JSON.stringify(p.measures))))
+				const url = location.origin + location.pathname + "?" + params.toString()
+				navigator.clipboard.writeText(url).then(() => showToast("LINK COPIED")).catch(() => {
+					prompt("Copy this link:", url)
+				})
+			}
+
+			function loadFromURL() {
+				const params = new URLSearchParams(location.search)
+				if (!params.size) return false
+				const title = params.get("_title")
+				if (title) {
+					S.title = b64dec(title)
+					document.getElementById("title-in").value = S.title
+				}
+				const parts = []
+				params.forEach((val, key) => {
+					if (key === "_title") return
+					try {
+						const measures = JSON.parse(b64dec(val))
+						parts.push({ id: parts.length + 1, name: key, measures: Array.isArray(measures) ? measures : [""] })
+					} catch (e) {}
+				})
+				if (parts.length) {
+					S.parts = parts
+					S.nextId = parts.length + 1
+				}
+				history.replaceState(null, "", location.pathname)
+				return parts.length > 0
+			}
+
+			function newScore() {
+				if (!confirm("開新譜？目前的草稿會從瀏覽器清除。")) return
+				pushHistory()
+				setFileContext(null, null)
+				localStorage.removeItem(STORAGE_KEY)
+				S.title = ""
+				S.parts = [{ id: 1, name: "PART 1", measures: [""] }]
+				S.nextId = 2
+				S.pop = null
+				S.playFromMi = 0
+				document.getElementById("title-in").value = ""
+				renderChips()
+				sched()
+			}
+
+			// ── Init ──────────────────────────────────────────────────────────────────────
+			document.addEventListener("DOMContentLoaded", () => {
+				const fromURL = loadFromURL()
+				if (!fromURL) loadFromStorage()
+				// Restore history or seed it with the loaded state
+				if (!fromURL && loadHistoryFromStorage()) {
+					// history restored — apply the last known state so S matches histIdx
+					applySnap(hist[histIdx])
+				} else {
+					pushHistory() // seed: initial state is undoable back-to
+				}
+				renderChips()
+				sched()
+
+				document.getElementById("title-in").addEventListener("input", (e) => {
+					S.title = e.target.value
+					sched()
+				})
+
+				// Volume slider — converts 0–100 linear to dB, applied to Tone.js master
+				function applyVol(v) {
+					const db = v === 0 ? -Infinity : 20 * Math.log10(v / 100)
+					Tone.getDestination().volume.value = db
+					document.getElementById("vol-label").textContent = v + "%"
+				}
+				applyVol(50) // default 50%
+				document.getElementById("vol-in").addEventListener("input", (e) => applyVol(+e.target.value))
+				document.getElementById("theme-btn").addEventListener("click", toggleTheme)
+				const bpmIn = document.getElementById("bpm-in")
+				document.getElementById("bpm-up").addEventListener("click", () => {
+					bpmIn.value = Math.min(300, +bpmIn.value + 1)
+				})
+				document.getElementById("bpm-dn").addEventListener("click", () => {
+					bpmIn.value = Math.max(40, +bpmIn.value - 1)
+				})
+				document.getElementById("seek-prev").addEventListener("click", () => seekBy(-1))
+				document.getElementById("seek-next").addEventListener("click", () => seekBy(+1))
+				document.getElementById("new-btn").addEventListener("click", newScore)
+				document.getElementById("save-btn").addEventListener("click", saveFile)
+				document.getElementById("share-btn").addEventListener("click", shareURL)
+				document.getElementById("import-btn").addEventListener("click", importViaFilePicker)
+				document.getElementById("import-file").addEventListener("change", importJSON)
+				document.getElementById("new-file-btn").addEventListener("click", newFilePicker)
+				document.getElementById("add-part-btn").addEventListener("click", addPart)
+				document.getElementById("export-btn").addEventListener("click", exportMD)
+				document.getElementById("print-btn").addEventListener("click", () => window.print())
+
+				// Popup toolbar [data-ins] buttons
+				document.querySelectorAll("[data-ins]").forEach((b) => b.addEventListener("click", () => ins(b.dataset.ins)))
+
+				// Popup controls
+				document.getElementById("pop-close").addEventListener("click", closePopup)
+				document.getElementById("pop-prev").addEventListener("click", () => navPopup(-1))
+				document.getElementById("pop-next").addEventListener("click", () => navPopup(+1))
+				document.getElementById("overlay").addEventListener("click", (e) => {
+					if (e.target === document.getElementById("overlay")) closePopup()
+				})
+
+				// Keyboard shortcuts
+				document.addEventListener("keydown", (e) => {
+					if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+						e.preventDefault()
+						saveToStorage()
+						showToast()
+						return
+					}
+					if ((e.metaKey || e.ctrlKey) && e.key === "z" && !S.pop) {
+						e.preventDefault()
+						if (e.shiftKey) redo(); else undo()
+						return
+					}
+					if ((e.metaKey || e.ctrlKey) && e.key === "y" && !S.pop) {
+						e.preventDefault()
+						redo()
+						return
+					}
+					if ((e.metaKey || e.ctrlKey) && e.key === "c" && S.sel.size && !S.pop) {
+						e.preventDefault()
+						copySel()
+						return
+					}
+					if ((e.metaKey || e.ctrlKey) && e.key === "v" && cellClipboard && S.sel.size && !S.pop) {
+						e.preventDefault()
+						pasteSel()
+						return
+					}
+					if (e.key === "Escape") {
+						if (S.sel.size) {
+							S.sel.clear()
+							renderSel()
+							return
+						}
+						if (S.pop) {
+							e.preventDefault()
+							closePopup()
+						}
+					}
+				})
+			})
+
+			// ── Theme ─────────────────────────────────────────────────────────────────────
+			function toggleTheme() {
+				S.theme = S.theme === "dark" ? "light" : "dark"
+				document.body.classList.toggle("light", S.theme === "light")
+				document.getElementById("theme-btn").textContent = S.theme === "dark" ? "◻ LITE" : "◼ DARK"
+			}
+
+			// ── Parts ─────────────────────────────────────────────────────────────────────
+			function renderChips() {
+				const c = document.getElementById("chips")
+				c.innerHTML = ""
+				S.parts.forEach((p, i) => {
+					const chip = document.createElement("div")
+					chip.className = "part-chip" + (S.pop && S.pop.pi === i ? " active-chip" : "")
+					chip.innerHTML = `
+      <span style="color:var(--pur);font-size:12px">♪</span>
+      <input class="pname" type="text" value="${x(p.name)}" onchange="rename(${i},this.value)">
+      <button class="chip-btn" onclick="movePart(${i},-1)" ${i === 0 ? "disabled" : ""} title="Move up">▲</button>
+      <button class="chip-btn" onclick="movePart(${i},1)"  ${i === S.parts.length - 1 ? "disabled" : ""} title="Move down">▼</button>
+      <button class="chip-btn del" onclick="rmPart(${i})" title="Remove">×</button>
+    `
+					c.appendChild(chip)
+				})
+			}
+
+			function rename(i, v) {
+				pushHistory()
+				S.parts[i].name = v
+				sched()
+			}
+
+			function addPart() {
+				pushHistory()
+				S.parts.push({ id: S.nextId++, name: `PART ${S.parts.length + 1}`, measures: [""] })
+				renderChips()
+				sched()
+			}
+
+			function rmPart(i) {
+				if (S.parts.length <= 1) return
+				pushHistory()
+				S.parts.splice(i, 1)
+				if (S.pop && S.pop.pi >= S.parts.length) S.pop = null
+				renderChips()
+				sched()
+			}
+
+			function movePart(i, d) {
+				const j = i + d
+				if (j < 0 || j >= S.parts.length) return
+				pushHistory()
+				;[S.parts[i], S.parts[j]] = [S.parts[j], S.parts[i]]
+				if (S.pop) {
+					if (S.pop.pi === i) S.pop.pi = j
+					else if (S.pop.pi === j) S.pop.pi = i
+				}
+				renderChips()
+				sched()
+			}
+
+			// ── Popup ─────────────────────────────────────────────────────────────────────
+			function openPopup(pi, mi) {
+				if (S.pop) savePopup() // save current before switching
+				S.sel.clear()
+				const part = S.parts[pi]
+				while (part.measures.length <= mi) part.measures.push("")
+				S.pop = { pi, mi }
+				document.getElementById("pop-label").textContent = `${part.name}  ·  MEASURE ${mi + 1}`
+				document.getElementById("pop-ta").value = part.measures[mi]
+				document.getElementById("pop-prev").disabled = mi === 0
+				document.getElementById("pop-next").disabled = false // can always extend
+				document.getElementById("overlay").classList.add("open")
+				document.getElementById("pop-ta").focus()
+				renderChips()
+			}
+
+			function savePopup() {
+				if (!S.pop) return
+				const { pi, mi } = S.pop
+				const raw = document.getElementById("pop-ta").value
+				// Split on | — multiple segments create new measures after current
+				const segs = raw.split("|").map((s) => s.trim())
+				S.parts[pi].measures.splice(mi, 1, ...segs)
+				// Clean up: remove trailing empty measures (but keep at least 1)
+				while (S.parts[pi].measures.length > 1 && S.parts[pi].measures.at(-1) === "") {
+					S.parts[pi].measures.pop()
+				}
+			}
+
+			function closePopup() {
+				if (S.pop) pushHistory()
+				savePopup()
+				S.pop = null
+				document.getElementById("overlay").classList.remove("open")
+				renderChips()
+				sched()
+			}
+
+			function navPopup(dir) {
+				if (!S.pop) return
+				pushHistory()
+				savePopup()
+				const { pi } = S.pop
+				const ms = S.parts[pi]?.measures || []
+				let mi = S.pop.mi + dir
+				// Skip repeat markers
+				while (mi >= 0 && mi < ms.length && (ms[mi] === "|:" || ms[mi] === ":|")) mi += dir
+				if (mi < 0) mi = 0
+				openPopup(pi, mi)
+				sched()
+			}
+
+			// ── Cursor insert (works in popup textarea) ───────────────────────────────────
+			function ta() {
+				return document.getElementById("pop-ta")
+			}
+
+			function ins(text) {
+				const t = ta()
+				const s = t.selectionStart,
+					e = t.selectionEnd
+				t.value = t.value.slice(0, s) + text + t.value.slice(e)
+				t.selectionStart = t.selectionEnd = s + text.length
+				t.focus()
+			}
+
+			function del() {
+				const t = ta()
+				const s = t.selectionStart,
+					e = t.selectionEnd
+				if (s !== e) {
+					t.value = t.value.slice(0, s) + t.value.slice(e)
+					t.selectionStart = t.selectionEnd = s
+				} else if (s > 0) {
+					t.value = t.value.slice(0, s - 1) + t.value.slice(s)
+					t.selectionStart = t.selectionEnd = s - 1
+				}
+				t.focus()
+			}
+
+			// ── Repeat helpers ────────────────────────────────────────────────────────────
+			// Returns array of original measure indices in playback order, repeats expanded.
+			function buildPlaySeq(measures) {
+				const seq = [],
+					stack = []
+				for (let i = 0; i < measures.length; i++) {
+					if (measures[i] === "|:") {
+						stack.push(seq.length)
+					} else if (measures[i] === ":|") {
+						if (stack.length) seq.push(...seq.slice(stack.pop()))
+					} else {
+						seq.push(i)
+					}
+				}
+				return seq
+			}
+
+			// Returns {starts: Set<displayIdx>, ends: Set<displayIdx>} for border decoration.
+			function repeatBorders(measures) {
+				const starts = new Set(),
+					ends = new Set()
+				let di = 0,
+					pendingStart = false
+				for (const m of measures) {
+					if (m === "|:") {
+						pendingStart = true
+					} else if (m === ":|") {
+						if (di > 0) ends.add(di - 1)
+					} else {
+						if (pendingStart) {
+							starts.add(di)
+							pendingStart = false
+						}
+						di++
+					}
+				}
+				return { starts, ends }
+			}
+
+			// ── Parser & beat math: see notation.js (parseNote, expandTok, parseMeasure,
+			//    displayBeats, groupBeats, measureDuration, validateMeasure) ────────────────
+
+			// ── Note renderer ─────────────────────────────────────────────────────────────
+			function noteBody(n) {
+				// Rhythm hit: x
+				if (n.type === "rhythm") {
+					let b = n.bold ? `\\boldsymbol{x}` : `x`
+					for (let u = 0; u < n.ul; u++) b = `\\underline{${b}}`
+					if (n.dt) b += "\\cdot"
+					for (let d = 0; d < n.ds; d++) b += "\\ -"
+					return b
+				}
+				// Chord name
+				if (n.type === "chord") {
+					const safe = n.chord.replace(/#/g, "\\#") // escape # inside \text{}
+					let b = n.bold ? `\\textbf{${safe}}` : `\\text{${safe}}`
+					for (let u = 0; u < n.ul; u++) b = `\\underline{${b}}`
+					if (n.dt) b += "\\cdot"
+					for (let d = 0; d < n.ds; d++) b += "\\ -"
+					return b
+				}
+				// Regular note
+				let b = n.num.toString()
+				if (n.ou >= 2) b = `\\dot{\\dot{${b}}}`
+				else if (n.ou === 1) b = `\\dot{${b}}`
+				else if (n.od >= 2) b = `\\underset{\\cdot\\cdot}{${b}}`
+				else if (n.od === 1) b = `\\underset{\\cdot}{${b}}`
+				for (let u = 0; u < n.ul; u++) b = `\\underline{${b}}`
+				if (n.dt) b += "\\cdot"
+				for (let d = 0; d < n.ds; d++) b += "\\ -"
+				if (n.bold) b = `\\mathbf{${b}}`
+				return b
+			}
+
+			function accUpd(map, n) {
+				// Only track accidentals for regular notes
+				if (!n || n.type !== "note" || n.num <= 0) return ""
+				const c = n.acc,
+					l = map[n.num]
+				map[n.num] = c
+				if (l === undefined) return c
+				if (c === l) return ""
+				if (c === "" && l) return "%"
+				return c
+			}
+
+			function katexH(latex) {
+				if (typeof katex === "undefined") return `<code>${x(latex)}</code>`
+				try {
+					return katex.renderToString(latex, { throwOnError: false })
+				} catch (e) {
+					return `<code>${x(latex)}</code>`
+				}
+			}
+
+			function noteH(n, prefix) {
+				// rhythm and chord: no accidental prefix needed from state machine
+				if (n.type === "rhythm" || n.type === "chord") return katexH(noteBody(n))
+				return (prefix ? `<span class="acc">${x(prefix)}</span>` : "") + katexH(noteBody(n))
+			}
+
+			function groupH(g, map) {
+				return g.map((n) => noteH(n, accUpd(map, n))).join('<span class="tie">⌢</span>')
+			}
+
+			// ── Beam (shared underline / 共用減時線) ──────────────────────────────────────
+			function isBeamable(g) {
+				// Single note or rhythm hit with underline(s), no long-note dashes
+				return g.length === 1 && (g[0].type === "note" || g[0].type === "rhythm") && g[0].ul >= 1 && g[0].ds === 0
+			}
+
+			function noteBodyNoUl(n, acc) {
+				// Like noteBody() but omits the \underline wrapping; acc is the resolved accidental
+				if (n.type === "rhythm") {
+					let b = n.bold ? "\\boldsymbol{x}" : "x"
+					if (n.dt) b += "\\cdot"
+					return b
+				}
+				let b = n.num.toString()
+				if (n.ou >= 2) b = `\\dot{\\dot{${b}}}`
+				else if (n.ou === 1) b = `\\dot{${b}}`
+				else if (n.od >= 2) b = `\\underset{\\cdot\\cdot}{${b}}`
+				else if (n.od === 1) b = `\\underset{\\cdot}{${b}}`
+				if (n.dt) b += "\\cdot"
+				if (n.bold) b = `\\mathbf{${b}}`
+				if (acc === "#") b = "\\#" + b
+				else if (acc === "b") b = "b" + b
+				else if (acc === "%") b = "\\natural " + b
+				return b
+			}
+
+			function beamLatex(groups, map, baseUl) {
+				// Returns a single LaTeX string (not HTML) for a beam group.
+				// baseUl = how many underline levels the outer context already provides.
+				const minUl = Math.min(...groups.map((g) => g[0].ul))
+				const extraUl = minUl - baseUl
+
+				const parts = []
+				let i = 0
+				while (i < groups.length) {
+					if (groups[i][0].ul > minUl) {
+						// Collect consecutive notes at higher ul into a sub-beam
+						let j = i + 1
+						while (j < groups.length && groups[j][0].ul > minUl) j++
+						if (j - i >= 2) {
+							parts.push(beamLatex(groups.slice(i, j), map, minUl))
+						} else {
+							// Lone note at higher ul — wrap individually
+							const n = groups[i][0]
+							const acc = accUpd(map, n)
+							let b = noteBodyNoUl(n, acc)
+							for (let u = 0; u < n.ul - minUl; u++) b = `\\underline{${b}}`
+							parts.push(b)
+						}
+						i = j
+					} else {
+						const n = groups[i][0]
+						parts.push(noteBodyNoUl(n, accUpd(map, n)))
+						i++
+					}
+				}
+
+				// Use slightly wider spacing for 16th notes and above so each digit
+				// reads as its own short value rather than a fused block.
+				const sep = minUl >= 2 ? "\\;" : "\\ "
+				let inner = parts.join(sep)
+				for (let u = 0; u < extraUl; u++) inner = `\\underline{${inner}}`
+				return inner
+			}
+
+			// displayBeats() / groupBeats() now live in notation.js (layout-width beats).
+
+			function measureH(groups, map) {
+				if (!groups.length) return '<span class="empty" style="flex:1;text-align:center">—</span>'
+				const tie = '<span class="tie">⌢</span>'
+
+				const prefix = groups[0]._tieIn ? tie : ""
+				const suffix = groups[groups.length - 1]._tieOut ? tie : ""
+
+				const slots = []
+				let i = 0
+				while (i < groups.length) {
+					let j = i
+					while (j < groups.length && isBeamable(groups[j])) j++
+					if (j - i >= 2) {
+						const run = groups.slice(i, j)
+						// 16th notes (ul≥2) beam in pairs — gives staccato visual separation;
+						// 8th notes beam in fours (standard jianpu convention).
+						const CHUNK = run[0][0].ul >= 2 ? 2 : 4
+						for (let k = 0; k < run.length; k += CHUNK) {
+							const chunk = run.slice(k, k + CHUNK)
+							const beats = chunk.reduce((s, g) => s + groupBeats(g), 0)
+							const html = chunk.length >= 2 ? katexH(beamLatex(chunk, map, 0)) : groupH(chunk[0], map)
+							slots.push({ html, beats })
+						}
+						i = j
+					} else {
+						slots.push({ html: groupH(groups[i], map), beats: groupBeats(groups[i]) })
+						i++
+					}
+				}
+
+				const inner = slots.map(({ html, beats }) => `<span class="bslot" style="flex:${beats}">${html}</span>`).join("")
+
+				return prefix + inner + suffix
+			}
+
+			// ── Preview ───────────────────────────────────────────────────────────────────
+			// Fast path: toggle copy-sel class in-place without rebuilding any DOM.
+			// Use this whenever ONLY the selection set changes — no content, no playhead.
+			function renderSel() {
+				document.querySelectorAll(".m-cell[data-pi][data-mi]").forEach((cell) => {
+					const key = cell.dataset.pi + ":" + cell.dataset.mi
+					cell.classList.toggle("copy-sel", S.sel.has(key))
+				})
+			}
+
+			function sched() {
+				clearTimeout(previewTimer)
+				previewTimer = setTimeout(render, 160)
+				clearTimeout(saveTimer)
+				saveTimer = setTimeout(saveToStorage, 1000)
+			}
+
+			function render() {
+				const box = document.getElementById("preview-box")
+
+				// Per-part: build display index → original index map, skipping |: and :| markers
+				const dmaps = S.parts.map((p) => {
+					const dm = [] // dm[displayIdx] = originalIdx
+					const rb = repeatBorders(p.measures)
+					p.measures.forEach((m, i) => {
+						if (m !== "|:" && m !== ":|") dm.push(i)
+					})
+					return { dm, rb }
+				})
+				const maxM = Math.max(...dmaps.map(({ dm }) => dm.length), 0)
+				if (!maxM) {
+					box.innerHTML = '<div class="no-notes">NO NOTES YET — click a cell to start editing</div>'
+					return
+				}
+
+				let h = ""
+				if (S.title) h += `<div class="prev-title">${x(S.title)}</div>`
+
+				// First system has pn-cell + (MPR-1) measures; subsequent systems have MPR measures.
+				const FIRST_MPR = MPR - 1
+				for (let ss = 0, sysIdx = 0; ss < maxM; ss += sysIdx === 0 ? FIRST_MPR : MPR, sysIdx++) {
+					const cols = sysIdx === 0 ? FIRST_MPR : MPR
+					const se = Math.min(ss + cols, maxM)
+					const isLastRow = se === maxM
+					const isFirstSys = sysIdx === 0
+					h += '<table class="sys"><tbody>'
+					S.parts.forEach((part, pi) => {
+						const { dm, rb } = dmaps[pi]
+						h += "<tr>"
+						if (isFirstSys) h += `<td class="pn-cell">${x(part.name)}</td>`
+						for (let di = ss; di < ss + cols; di++) {
+							if (di < se) {
+								const mi = di < dm.length ? dm[di] : null
+								if (mi === null) {
+									h += '<td class="m-cell" style="pointer-events:none"></td>'
+								} else {
+									const text = part.measures[mi]
+									let inner = _renderCache.get(text)
+									if (inner === undefined) {
+										inner = measureH(parseMeasure(text), {})
+										_renderCache.set(text, inner)
+									}
+									const sel = S.pop && S.pop.pi === pi && S.pop.mi === mi
+									const isCopySel = S.sel.has(pi + ":" + mi)
+									const isPlayhead = !_playing && S.playFromMi === mi
+									const isPlaying = _playing && S.playingMi === mi
+									const cls =
+										"m-cell" +
+										(isCopySel ? " copy-sel" : "") +
+										(sel ? " selected" : "") +
+										(isPlayhead ? " playhead" : "") +
+										(isPlaying ? " playing" : "") +
+										(rb.starts.has(di) ? " repeat-start" : "") +
+										(rb.ends.has(di) ? " repeat-end" : "")
+									h += `<td class="${cls}" data-pi="${pi}" data-mi="${mi}" onmousedown="cellMd(${pi},${mi},event)">`
+									h += `<span class="mnum" onmousedown="numMd(${mi},event)">${di + 1}</span>`
+									h += `<div class="m-inner">${inner}</div>`
+									h += "</td>"
+								}
+							} else {
+								h += '<td class="m-cell" style="pointer-events:none"></td>'
+							}
+						}
+						if (isLastRow) {
+							h += `<td class="m-add-cell" onclick="openPopup(${pi},${part.measures.length})" title="Add measure">+</td>`
+						}
+						h += "</tr>"
+					})
+					h += "</tbody></table>"
+				}
+				box.innerHTML = h
+				requestAnimationFrame(() => autoFitMeasures(0, false))
+			}
+
+			// ── Dense measure auto-scaling ────────────────────────────────────────────────
+			// Clones each m-inner into an off-screen unconstrained div to measure natural
+			// content width, bypassing all flex/overflow/!important CSS issues.
+			// For print, compares against hardcoded A4 column width (≈146px at 96 dpi).
+			// Results are cached by (text, availPx, basePx) — only cells whose content or
+			// width changed since the last call incur a DOM clone / reflow.
+			const PRINT_CELL_W = 146
+			function autoFitMeasures(basePx, useImportant) {
+				const cells = Array.from(document.querySelectorAll(".m-cell[data-pi][data-mi]"))
+				if (!cells.length) return
+
+				// 1. Reset overrides so clientWidth reflects natural column width
+				cells.forEach((c) => {
+					if (useImportant) c.style.removeProperty("font-size")
+					else c.style.fontSize = ""
+				})
+
+				// 2. Apply baseline font (print mode only)
+				const fontSize = basePx || 17
+				if (basePx) {
+					cells.forEach((c) => {
+						if (useImportant) c.style.setProperty("font-size", basePx + "px", "important")
+						else c.style.fontSize = basePx + "px"
+					})
+				}
+
+				// 3. Batch-read available widths + build per-cell metadata (one reflow)
+				const cellData = cells.map((cell) => {
+					const inner = cell.querySelector(".m-inner")
+					const text = S.parts[+cell.dataset.pi]?.measures[+cell.dataset.mi] ?? ""
+					const availPx = basePx ? PRINT_CELL_W : (inner ? inner.clientWidth : 0)
+					const cacheKey = text + "|" + availPx + "|" + fontSize
+					return { cell, inner, text, availPx, cacheKey }
+				})
+
+				// 4. Apply cached results immediately; collect misses for cloning
+				const misses = []
+				cellData.forEach((d) => {
+					if (_fitCache.has(d.cacheKey)) {
+						const cached = _fitCache.get(d.cacheKey)
+						if (cached) {
+							if (useImportant) d.cell.style.setProperty("font-size", cached + "px", "important")
+							else d.cell.style.fontSize = cached + "px"
+						}
+					} else {
+						misses.push(d)
+					}
+				})
+				if (!misses.length) return
+
+				// 5. Clone only cache-miss cells
+				const clones = misses.map((d) => {
+					const clone = document.createElement("div")
+					clone.style.cssText = `position:absolute;left:-9999px;top:-9999px;visibility:hidden;white-space:nowrap;font-size:${fontSize}px`
+					if (d.inner) {
+						clone.innerHTML = d.inner.innerHTML
+						clone.querySelectorAll(".bslot").forEach((s) => {
+							s.style.setProperty("min-width", "max-content", "important")
+							s.style.setProperty("overflow", "visible", "important")
+						})
+					}
+					return clone
+				})
+
+				// 6. Batch-append → batch-read → batch-remove (one reflow)
+				const frag = document.createDocumentFragment()
+				clones.forEach((c) => frag.appendChild(c))
+				document.body.appendChild(frag)
+
+				misses.forEach((d, i) => {
+					const natural = clones[i].scrollWidth
+					const ratio = d.availPx > 0 ? natural / d.availPx : 1
+					let newSize = 0
+					if (ratio > 1.0) {
+						newSize = Math.max(Math.floor(fontSize / (ratio * 1.15)), 8)
+						if (useImportant) d.cell.style.setProperty("font-size", newSize + "px", "important")
+						else d.cell.style.fontSize = newSize + "px"
+					}
+					_fitCache.set(d.cacheKey, newSize)
+				})
+
+				clones.forEach((c) => c.remove())
+			}
+			window.addEventListener("beforeprint", () => autoFitMeasures(15, true))
+			window.addEventListener("afterprint", () => {
+				document.querySelectorAll(".m-cell[data-mi]").forEach((c) => c.style.removeProperty("font-size"))
+				requestAnimationFrame(() => autoFitMeasures(0, false))
+			})
+
+			// ── File badge ────────────────────────────────────────────────────────────────
+			function setFileContext(handle, name) {
+				_fileHandle = handle
+				_fileName = name
+				const badge = document.getElementById("file-badge")
+				const saveBtn = document.getElementById("save-btn")
+				if (name) {
+					badge.textContent = "📄 " + name
+					badge.style.display = ""
+					saveBtn.textContent = "↓ SAVE FILE"
+					saveBtn.disabled = false
+				} else {
+					badge.style.display = "none"
+					saveBtn.textContent = "↓ SAVE"
+					saveBtn.disabled = true
+				}
+			}
+
+			function buildExportJSON() {
+				return JSON.stringify({
+					title: S.title,
+					parts: S.parts.map((p) => ({ name: p.name, measures: p.measures })),
+				}, null, 2)
+			}
+
+			// ── Import ────────────────────────────────────────────────────────────────────
+			function _applyJSONText(text) {
+				try {
+					pushHistory()
+					const data = JSON.parse(text)
+					if (data.title) {
+						S.title = data.title
+						document.getElementById("title-in").value = data.title
+					}
+					if (Array.isArray(data.parts) && data.parts.length) {
+						S.parts = data.parts.map((p, i) => ({
+							id: i + 1,
+							name: p.name || `PART ${i + 1}`,
+							measures: Array.isArray(p.measures) ? p.measures : (p.text || "").split("|").map((s) => s.trim()),
+						}))
+						S.nextId = S.parts.length + 1
+					}
+					renderChips()
+					sched()
+				} catch (err) {
+					alert("JSON parse error: " + err.message)
+				}
+			}
+
+			function importJSON(e) {
+				const file = e.target.files[0]
+				if (!file) return
+				setFileContext(null, file.name) // no handle from <input type="file">
+				const reader = new FileReader()
+				reader.onload = (ev) => { _applyJSONText(ev.target.result); e.target.value = "" }
+				reader.readAsText(file)
+			}
+
+			async function importViaFilePicker() {
+				if (typeof window.showOpenFilePicker !== "undefined") {
+					try {
+						const [handle] = await window.showOpenFilePicker({
+							types: [{ description: "Jianpu JSON", accept: { "application/json": [".json"] } }],
+						})
+						setFileContext(handle, handle.name)
+						const file = await handle.getFile()
+						_applyJSONText(await file.text())
+					} catch (e) {
+						if (e.name !== "AbortError") console.error(e)
+					}
+				} else {
+					document.getElementById("import-file").click()
+				}
+			}
+
+			// ── Save file ─────────────────────────────────────────────────────────────────
+			async function saveFile() {
+				saveToStorage()
+				const json = buildExportJSON()
+
+				if (_fileHandle) {
+					try {
+						const writable = await _fileHandle.createWritable()
+						await writable.write(json)
+						await writable.close()
+						showToast("FILE SAVED")
+						return
+					} catch (e) {
+						if (e.name === "NotAllowedError") setFileContext(null, _fileName)
+					}
+				}
+
+				if (_fileName) {
+					const blob = new Blob([json], { type: "application/json" })
+					const a = document.createElement("a")
+					a.href = URL.createObjectURL(blob)
+					a.download = _fileName
+					a.click()
+					showToast("FILE SAVED")
+				}
+			}
+
+			// ── New file (Save As) ────────────────────────────────────────────────────────
+			async function newFilePicker() {
+				const json = buildExportJSON()
+				const suggested = (S.title || "jianpu") + ".json"
+
+				if (typeof window.showSaveFilePicker !== "undefined") {
+					try {
+						const handle = await window.showSaveFilePicker({
+							suggestedName: suggested,
+							types: [{ description: "Jianpu JSON", accept: { "application/json": [".json"] } }],
+						})
+						const writable = await handle.createWritable()
+						await writable.write(json)
+						await writable.close()
+						setFileContext(handle, handle.name)
+						showToast("FILE CREATED")
+					} catch (e) {
+						if (e.name !== "AbortError") console.error(e)
+					}
+				} else {
+					// Fallback: download then treat that filename as the current file
+					const blob = new Blob([json], { type: "application/json" })
+					const a = document.createElement("a")
+					a.href = URL.createObjectURL(blob)
+					a.download = suggested
+					a.click()
+					setFileContext(null, suggested)
+					showToast("DOWNLOADED")
+				}
+			}
+
+			// ── Export MD ─────────────────────────────────────────────────────────────────
+			function groupMD(g, map) {
+				return g
+					.map((n) => {
+						const p = accUpd(map, n)
+						return (p || "") + "$" + noteBody(n) + "$"
+					})
+					.join("⌢")
+			}
+
+			function exportMD() {
+				// Build display measures (skip |: :| markers) + repeat border info per part
+				const mdmaps = S.parts.map((p) => {
+					const dm = [],
+						rb = repeatBorders(p.measures)
+					p.measures.forEach((m, i) => {
+						if (m !== "|:" && m !== ":|") dm.push(i)
+					})
+					return { dm, rb }
+				})
+				const maxM = Math.max(...mdmaps.map(({ dm }) => dm.length), 0)
+				let md = ""
+				if (S.title) md += `# ${S.title}\n\n`
+				for (let ss = 0; ss < maxM; ss += MPR) {
+					const se = Math.min(ss + MPR, maxM),
+						cols = se - ss
+					md += "| |" + " |".repeat(cols) + "\n"
+					md += "|:--|" + ":--|".repeat(cols) + "\n"
+					S.parts.forEach((p, pi) => {
+						const { dm, rb } = mdmaps[pi]
+						const map = {}
+						md += `| **${p.name}** |`
+						for (let di = ss; di < se; di++) {
+							const mi = di < dm.length ? dm[di] : null
+							if (mi === null) {
+								md += "  |"
+								continue
+							}
+							const gs = parseMeasure(p.measures[mi])
+							const content = gs.map((g) => groupMD(g, map)).join(" ")
+							const pre = rb.starts.has(di) ? "\\|: " : ""
+							const post = rb.ends.has(di) ? " :\\|" : ""
+							md += ` ${pre}${content}${post} |`
+						}
+						md += "\n"
+					})
+					md += "\n"
+				}
+				const a = document.createElement("a")
+				a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }))
+				a.download = (S.title || "jianpu") + ".md"
+				a.click()
+			}
+
+			// ── Util ──────────────────────────────────────────────────────────────────────
+			function x(s) {
+				return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+			}
+
+			// ── Playback ──────────────────────────────────────────────────────────────────
+			const _NUM2NOTE = ["", "C", "D", "E", "F", "G", "A", "B"]
+			const _NOTE_ST = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
+			const _MIDI_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+			// MIDI note number (C-1 = 0)
+			function _noteToMidi(letter, acc, octave) {
+				const base = _NOTE_ST[letter]
+				if (base === undefined) return null
+				const alt = acc === "#" ? 1 : acc === "b" ? -1 : 0
+				return (octave + 1) * 12 + base + alt
+			}
+
+			// Tone.js note string, e.g. "C4", "D#5"
+			function _midiToTone(m) {
+				if (m === null) return null
+				return _MIDI_NAMES[((m % 12) + 12) % 12] + Math.floor(m / 12 - 1)
+			}
+
+			// Note duration in beats (1 beat = 1 quarter note)
+			function _tokenBeats(n) {
+				let beats = 1 / Math.pow(2, n.ul) // 0ul→1, 1ul→0.5, 2ul→0.25, 3ul→0.125
+				if (n.dt === 1)
+					beats *= 1.5 // dot applies to note head first
+				else if (n.dt >= 2) beats *= 1.75
+				beats += n.ds // each dash = +1 quarter beat after dot
+				return beats
+			}
+
+			// Chord type → semitone intervals
+			const _CHORD_INT = {
+				"": [0, 4, 7],
+				maj: [0, 4, 7],
+				M: [0, 4, 7],
+				m: [0, 3, 7],
+				min: [0, 3, 7],
+				7: [0, 4, 7, 10],
+				maj7: [0, 4, 7, 11],
+				m7: [0, 3, 7, 10],
+				dim: [0, 3, 6],
+				aug: [0, 4, 8],
+				5: [0, 7],
+				sus2: [0, 2, 7],
+				sus4: [0, 5, 7],
+			}
+
+			function _chordTones(chordName, octave) {
+				const m = chordName.split("/")[0].match(/^([A-G][#b]?)(.*)$/)
+				if (!m) return []
+				const rMatch = m[1].match(/^([A-G])([#b]?)$/)
+				if (!rMatch) return []
+				const rootMidi = _noteToMidi(rMatch[1], rMatch[2], octave)
+				if (rootMidi === null) return []
+				const type = m[2].replace(/add\d+/, "").replace(/\d+$/, (t) => (t === "7" ? "7" : ""))
+				const normalized = type.startsWith("maj7")
+					? "maj7"
+					: type.startsWith("m7")
+						? "m7"
+						: type.startsWith("maj")
+							? "maj"
+							: type.startsWith("min")
+								? "min"
+								: type.startsWith("dim")
+									? "dim"
+									: type.startsWith("aug")
+										? "aug"
+										: type.startsWith("sus4")
+											? "sus4"
+											: type.startsWith("sus2")
+												? "sus2"
+												: type === "5"
+													? "5"
+													: type === "7"
+														? "7"
+														: type === "m"
+															? "m"
+															: ""
+				const intervals = _CHORD_INT[normalized] || _CHORD_INT[""]
+				return intervals.map((i) => _midiToTone(rootMidi + i)).filter(Boolean)
+			}
+
+			// Convert a parsed token (from parseNote) + accidental carry-map → Tone note(s)
+			// Returns array of Tone.js note strings (may be multiple for chords)
+			function _tokenToTones(n, accMap) {
+				if (!n) return []
+				if (n.type === "rhythm") return []
+				if (n.type === "chord") return _chordTones(n.chord, 3)
+				if (n.num === 0) return [] // rest
+				const letter = _NUM2NOTE[n.num]
+				if (!letter) return []
+				const octave = 4 + n.ou - n.od
+				let acc = n.acc
+				if (acc === "%") {
+					accMap[n.num] = ""
+					acc = ""
+				} else if (acc !== "") {
+					accMap[n.num] = acc
+				} else {
+					acc = accMap[n.num] || ""
+				}
+				const m = _noteToMidi(letter, acc, octave)
+				return m !== null ? [_midiToTone(m)] : []
+			}
+
+			// Build all scheduled events from S.parts.
+			// Cross-measure tie-out:  last token of a measure ends with  '+'  e.g. "7---+"
+			// Cross-measure tie-in:   first token of a measure starts with '+' e.g. "+7---"
+			// A tie-in group whose pitches match the pending tie-out extends that note's
+			// duration instead of scheduling a new attack.
+			function _buildEvents(secPerBeat) {
+				const events = []
+				S.parts.forEach((part, pi) => {
+					let t = 0
+					// pendingTie: { idx, key } where idx is the events[] index and key is the
+					// sorted pitch string to match against the next tie-in note.
+					let pendingTie = null
+
+					const partPlaySeq = buildPlaySeq(part.measures)
+					partPlaySeq.forEach((origIdx) => {
+						const mText = origIdx < part.measures.length ? part.measures[origIdx] : ""
+						const groups = parseMeasure(mText)
+						const accMap = {}
+
+						groups.forEach((group, groupIdx) => {
+							const isTieIn = !!group._tieIn
+							const isTieOut = !!group._tieOut
+
+							let totalBeats = 0
+							const tones = []
+							group.forEach((n) => {
+								totalBeats += _tokenBeats(n)
+								if (tones.length === 0) {
+									_tokenToTones(n, accMap).forEach((tone) => tones.push(tone))
+								} else {
+									_tokenToTones(n, { ...accMap })
+								}
+							})
+							const durSec = totalBeats * secPerBeat
+							const pitchKey = [...tones].sort().join(",")
+
+							// Honor the tie if:
+							//   a) the note is explicitly marked _tieIn, OR
+							//   b) it is the first note of the measure and the previous measure
+							//      tied out with the same pitch (implied tie — this score uses
+							//      trailing '+' only; continuation measures carry no leading '+').
+							const isTieContinuation =
+								pendingTie && tones.length > 0 && pendingTie.key === pitchKey &&
+								(isTieIn || groupIdx === 0)
+
+							if (isTieContinuation) {
+								// Extend previous note's duration — no new attack
+								events[pendingTie.idx].dur += durSec
+								pendingTie = isTieOut ? { idx: pendingTie.idx, key: pitchKey } : null
+							} else {
+								pendingTie = null
+								if (tones.length > 0) {
+									const idx = events.length
+									events.push({ time: t, notes: tones, dur: Math.max(durSec * 0.92, 0.04), partIdx: pi })
+									if (isTieOut) pendingTie = { idx, key: pitchKey }
+								} else if (group.some((n) => n.type === "rhythm")) {
+									// x rhythm hit — no pitch, use dedicated percussion synth
+									events.push({ time: t, notes: null, dur: 0.08, partIdx: pi, percussion: true })
+								}
+							}
+
+							t += durSec
+						})
+						// pendingTie intentionally survives across measure boundaries
+					})
+				})
+				return events
+			}
+
+			// Part-specific synth configs: [volume(dB), pan, waveform]
+			const _PART_CFG = [
+				[-3, 0, "triangle"], // melody
+				[-6, -0.25, "triangle"], // harmony
+				[-3, 0.2, "sawtooth"], // bass — sawtooth harmonics stay audible on laptop speakers
+				[-8, 0, "triangle"], // chords
+			]
+
+			let _synths = []
+			let _noiseSynth = null
+			let _reverb = null
+			let _playing = false
+			let _animFrame = null
+			let _measureTimes = []
+			let _masterPlaySeq = [] // part-0 play sequence: seqPos → origMeasureIdx
+			let _playStartOffset = 0
+
+			// ── Playhead seek helpers ─────────────────────────────────────────────────────
+			function applySeekGlobal(m) {
+				S.playFromMi = m
+				document.querySelectorAll(".m-cell.playhead").forEach((c) => c.classList.remove("playhead"))
+				document.querySelectorAll(`.m-cell[data-mi="${m}"]`).forEach((c) => c.classList.add("playhead"))
+				updateSeekDisplay()
+			}
+			function updateSeekDisplay() {
+				const seq = _masterPlaySeq.length ? _masterPlaySeq : buildPlaySeq(S.parts[0]?.measures || [])
+				const pos = seq.indexOf(S.playFromMi)
+				document.getElementById("seek-label").textContent = "M " + (pos < 0 ? 1 : pos + 1)
+			}
+			function seekBy(delta) {
+				if (_playing) return
+				const seq = _masterPlaySeq.length ? _masterPlaySeq : buildPlaySeq(S.parts[0]?.measures || [])
+				if (!seq.length) return
+				const cur = seq.indexOf(S.playFromMi)
+				const next = Math.max(0, Math.min(seq.length - 1, (cur < 0 ? 0 : cur) + delta))
+				applySeekGlobal(seq[next])
+			}
+
+			// ── Cell mousedown: click → popup, drag → seek ───────────────────────────────
+			function cellMd(pi, mi, e) {
+				if (e.button !== 0) return
+				if (_playing) { openPopup(pi, mi); return }
+
+				const key = pi + ":" + mi
+
+				// Ctrl/Cmd+click: toggle this cell in/out of copy-selection
+				if (e.metaKey || e.ctrlKey) {
+					e.preventDefault()
+					if (S.sel.has(key)) S.sel.delete(key)
+					else S.sel.add(key)
+					renderSel()
+					return
+				}
+
+				// Double-click: open editor (clear selection first)
+				if (e.detail >= 2) {
+					S.sel.clear()
+					openPopup(pi, mi)
+					return
+				}
+
+				// Single click on the sole already-selected cell: open editor
+				if (S.sel.size === 1 && S.sel.has(key)) {
+					S.sel.clear()
+					openPopup(pi, mi)
+					return
+				}
+
+				// Single click: select this cell (replace selection), also update playhead
+				applySeekGlobal(mi)
+				S.sel.clear()
+				S.sel.add(key)
+				renderSel()
+
+				// Allow drag to extend selection across cells
+				const startX = e.clientX, startY = e.clientY
+				let dragging = false
+				const onmove = (me) => {
+					if (!dragging && (Math.abs(me.clientX - startX) > 6 || Math.abs(me.clientY - startY) > 6)) {
+						dragging = true
+						document.body.style.cursor = "crosshair"
+					}
+					if (dragging) {
+						me.preventDefault()
+						const el = document.elementFromPoint(me.clientX, me.clientY)
+						const cell = el && (el.classList.contains("m-cell") ? el : el.closest?.(".m-cell"))
+						if (cell?.dataset.pi !== undefined && cell?.dataset.mi !== undefined) {
+							const cPi = +cell.dataset.pi, cMi = +cell.dataset.mi
+							if (!isNaN(cPi) && !isNaN(cMi)) {
+								const cKey = cPi + ":" + cMi
+								if (!S.sel.has(cKey)) { S.sel.add(cKey); renderSel() }
+							}
+						}
+					}
+				}
+				const onup = () => {
+					document.body.style.cursor = ""
+					document.removeEventListener("mousemove", onmove)
+					document.removeEventListener("mouseup", onup)
+				}
+				document.addEventListener("mousemove", onmove)
+				document.addEventListener("mouseup", onup)
+			}
+
+			// ── Cell copy / paste ─────────────────────────────────────────────────────────
+			function copySel() {
+				if (!S.sel.size) return
+				const cells = [...S.sel]
+					.map((k) => { const [pi, mi] = k.split(":").map(Number); return { pi, mi } })
+					.sort((a, b) => a.pi - b.pi || a.mi - b.mi)
+				const minPi = cells[0].pi, minMi = cells[0].mi
+				cellClipboard = cells.map(({ pi, mi }) => ({
+					dpi: pi - minPi,
+					dmi: mi - minMi,
+					text: S.parts[pi]?.measures[mi] ?? "",
+				}))
+				showToast("COPIED")
+			}
+
+			function pasteSel() {
+				if (!cellClipboard || !S.sel.size) return
+				pushHistory()
+				const anchor = [...S.sel]
+					.map((k) => k.split(":").map(Number))
+					.sort((a, b) => a[0] - b[0] || a[1] - b[1])[0]
+				const [aPi, aMi] = anchor
+				cellClipboard.forEach(({ dpi, dmi, text }) => {
+					const pi = aPi + dpi, mi = aMi + dmi
+					if (pi < 0 || pi >= S.parts.length) return
+					while (S.parts[pi].measures.length <= mi) S.parts[pi].measures.push("")
+					S.parts[pi].measures[mi] = text
+				})
+				sched()
+				showToast("PASTED")
+			}
+
+			// ── Playhead drag (mnum) ──────────────────────────────────────────────────────
+			function numMd(mi, e) {
+				e.stopPropagation()
+				e.preventDefault()
+				if (_playing) return
+				applySeekGlobal(mi)
+				document.body.style.cursor = "grabbing"
+				const onmove = (me) => {
+					me.preventDefault()
+					const el = document.elementFromPoint(me.clientX, me.clientY)
+					const cell = el && (el.classList.contains("m-cell") ? el : el.closest?.(".m-cell"))
+					if (cell?.dataset.mi !== undefined) {
+						const m = +cell.dataset.mi
+						if (!isNaN(m) && m !== S.playFromMi) applySeekGlobal(m)
+					}
+				}
+				const onup = () => {
+					document.body.style.cursor = ""
+					document.removeEventListener("mousemove", onmove)
+					document.removeEventListener("mouseup", onup)
+				}
+				document.addEventListener("mousemove", onmove)
+				document.addEventListener("mouseup", onup)
+			}
+
+			// ── Measure timeline builder ──────────────────────────────────────────────────
+			function _buildMeasureTimes(secPerBeat) {
+				const times = []
+				if (!S.parts.length || !_masterPlaySeq.length) return times
+				let t = 0
+				const ms0 = S.parts[0].measures
+				_masterPlaySeq.forEach((origIdx) => {
+					times.push(t)
+					const mText = origIdx < ms0.length ? ms0[origIdx] : ""
+					parseMeasure(mText).forEach((g) =>
+						g.forEach((n) => {
+							t += _tokenBeats(n) * secPerBeat
+						}),
+					)
+				})
+				return times
+			}
+
+			// ── Playing-cell animation ────────────────────────────────────────────────────
+			function _animTick() {
+				if (!_playing) return
+				const absTime = Tone.Transport.seconds + _playStartOffset
+				let seqPos = _measureTimes.length - 1
+				for (let i = 0; i < _measureTimes.length; i++) {
+					if (_measureTimes[i] > absTime) {
+						seqPos = i - 1
+						break
+					}
+				}
+				seqPos = Math.max(0, seqPos)
+				const mi = _masterPlaySeq[seqPos] ?? 0 // original measure index
+				if (mi !== S.playingMi) {
+					document.querySelectorAll(".m-cell.playing").forEach((c) => c.classList.remove("playing"))
+					document.querySelectorAll(`.m-cell[data-mi="${mi}"]`).forEach((c) => c.classList.add("playing"))
+					S.playingMi = mi
+					document.querySelector(`.m-cell[data-mi="${mi}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+				}
+				_animFrame = requestAnimationFrame(_animTick)
+			}
+
+			function _stopAnim() {
+				if (_animFrame) {
+					cancelAnimationFrame(_animFrame)
+					_animFrame = null
+				}
+				document.querySelectorAll(".m-cell.playing").forEach((c) => c.classList.remove("playing"))
+				S.playingMi = -1
+				sched() // redraw so playhead highlight reappears
+			}
+
+			// ── Start / Stop ──────────────────────────────────────────────────────────────
+			async function startPlay() {
+				if (_playing) return
+				await Tone.start()
+
+				const bpm = Math.max(40, Math.min(300, parseInt(document.getElementById("bpm-in").value) || 120))
+				Tone.Transport.bpm.value = bpm
+				Tone.Transport.cancel()
+
+				const secPerBeat = 60 / bpm
+				_masterPlaySeq = buildPlaySeq(S.parts[0]?.measures || [])
+				_measureTimes = _buildMeasureTimes(secPerBeat)
+				// Find the first sequence position that plays S.playFromMi
+				const startSeqPos = _masterPlaySeq.indexOf(S.playFromMi)
+				const startOffset = startSeqPos >= 0 ? (_measureTimes[startSeqPos] ?? 0) : 0
+				_playStartOffset = startOffset
+
+				// All events; filter to those at/after start, shift times to start at 0
+				const allEvents = _buildEvents(secPerBeat)
+				const events = allEvents.filter((e) => e.time >= startOffset - 0.001).map((e) => ({ ...e, time: e.time - startOffset }))
+				if (!events.length) return
+
+				// Pitched synths (one per part)
+				_synths = S.parts.map((_, pi) => {
+					const cfg = _PART_CFG[pi] || [-6, 0, "triangle"]
+					const synth = new Tone.PolySynth(Tone.Synth, {
+						oscillator: { type: cfg[2] },
+						envelope: { attack: 0.04, decay: 0.1, sustain: 0.6, release: 0.4 },
+						volume: cfg[0],
+					})
+					const pan = new Tone.Panner(cfg[1]).toDestination()
+					synth.connect(pan)
+					return { synth, pan }
+				})
+
+				// Noise synth for x rhythm hits
+				_noiseSynth = new Tone.NoiseSynth({
+					noise: { type: "white" },
+					envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.02 },
+					volume: -4,
+				}).toDestination()
+
+				// Schedule all events
+				events.forEach(({ time, notes, dur, partIdx, percussion }) => {
+					if (percussion) {
+						Tone.Transport.schedule((t) => _noiseSynth.triggerAttackRelease("8n", t), time)
+					} else {
+						const s = (_synths[partIdx] || _synths[0]).synth
+						Tone.Transport.schedule((t) => s.triggerAttackRelease(notes, dur, t), time)
+					}
+				})
+
+				const totalTime = Math.max(...events.map((e) => e.time + e.dur))
+				Tone.Transport.schedule(() => stopPlay(), totalTime + 0.1)
+
+				Tone.Transport.start()
+				_playing = true
+				document.getElementById("play-btn").disabled = true
+				document.getElementById("stop-btn").disabled = false
+
+				S.playingMi = S.playFromMi
+				_animTick()
+			}
+
+			function stopPlay() {
+				Tone.Transport.stop()
+				Tone.Transport.cancel()
+				_synths.forEach(({ synth, pan }) => {
+					try {
+						synth.dispose()
+						pan.dispose()
+					} catch (e) {}
+				})
+				_synths = []
+				if (_noiseSynth) {
+					try {
+						_noiseSynth.dispose()
+					} catch (e) {}
+					_noiseSynth = null
+				}
+				_playing = false
+				document.getElementById("play-btn").disabled = false
+				document.getElementById("stop-btn").disabled = true
+				_stopAnim()
+			}
+
+			document.addEventListener("DOMContentLoaded", () => {
+				document.getElementById("play-btn").addEventListener("click", startPlay)
+				document.getElementById("stop-btn").addEventListener("click", stopPlay)
+			})
+		</script>
+	</body>
+</html>
